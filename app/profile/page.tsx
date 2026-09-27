@@ -92,6 +92,26 @@ export default function ProfilePage() {
             </div>
 
             <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-600">Date of Birth</label>
+              <input
+                type="date"
+                value={profile.dateOfBirth || ''}
+                onChange={(e) => setProfile({ ...profile, dateOfBirth: e.target.value })}
+                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:bg-white"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-600">Age & Mode Status</label>
+              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                <span className="text-sm font-bold text-slate-800">Age: {profile.age || 25} yrs</span>
+                <Badge variant="secondary" className={profile.mode === 'kid' || (profile.age && profile.age < 16) ? 'bg-cyan-100 text-cyan-900 font-extrabold text-xs' : 'bg-emerald-100 text-emerald-900 font-extrabold text-xs'}>
+                  {profile.mode === 'kid' || (profile.age && profile.age < 16) ? 'KID MODE (< 16)' : 'ADULT MODE (>= 16)'}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-600">Phone Number</label>
               <input
                 type="text"

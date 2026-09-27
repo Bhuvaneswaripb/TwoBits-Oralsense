@@ -5,22 +5,50 @@ const Screening = require('../models/Screening');
 // POST /api/screenings - Save new AI-assisted screening summary
 router.post('/', async (req, res) => {
   try {
-    const { patientId, concern, score, overallScore, indicationLevel, summary, recommendedNextStep } = req.body;
+    const {
+      patientId,
+      concern,
+      score,
+      overallScore,
+      indicationLevel,
+      safety,
+      symptoms,
+      answers,
+      visualInputs,
+      hasVisualInput,
+      visualInputType,
+      whyHighlighted,
+      summary,
+      recommendedNextStep,
+      recommendations,
+    } = req.body;
 
     if (!concern) {
       return res.status(400).json({ success: false, message: 'Screening concern is required.' });
     }
 
-    const screeningScore = typeof score === 'number' ? score : typeof overallScore === 'number' ? overallScore : 68;
-    const level = indicationLevel || (screeningScore >= 70 ? 'HIGHER CONCERN' : screeningScore >= 40 ? 'MODERATE CONCERN' : 'LOWER CONCERN');
+    const screeningScore = typeof score === 'number' ? score : typeof overallScore === 'number' ? overallScore : 50;
+    const level =
+      indicationLevel ||
+      (screeningScore > 60 ? 'HIGHER CONCERN' : screeningScore > 30 ? 'MODERATE CONCERN' : 'LOWER CONCERN');
 
     const screening = await Screening.create({
       patientId: patientId || 'pat-default',
       concern,
       score: screeningScore,
+      overallScore: screeningScore,
       indicationLevel: level,
-      summary: summary || 'AI-assisted screening summary generated based on patient symptoms.',
-      recommendedNextStep: recommendedNextStep || 'Consider discussing persistent symptoms with a dental professional.',
+      safety: safety || {},
+      symptoms: symptoms || whyHighlighted || [],
+      answers: answers || {},
+      visualInputs: visualInputs || [],
+      hasVisualInput: Boolean(hasVisualInput || (visualInputs && visualInputs.length > 0)),
+      visualInputType: visualInputType || '',
+      whyHighlighted: whyHighlighted || symptoms || [],
+      summary: summary || recommendedNextStep || `AI-assisted screening summary for ${concern}.`,
+      recommendedNextStep:
+        recommendedNextStep || `Consider discussing persistent ${concern.toLowerCase()} symptoms with a dental professional.`,
+      recommendations: recommendations || [],
     });
 
     res.status(201).json({ success: true, data: screening });
@@ -29,7 +57,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/screenings/:patientId - Get latest screening for patient
+// GET /api/screenings/:patientId - Get latest screening and full history for patient
 router.get('/:patientId', async (req, res) => {
   try {
     const screenings = await Screening.find({ patientId: req.params.patientId }).sort({ createdAt: -1 });
@@ -37,21 +65,8 @@ router.get('/:patientId', async (req, res) => {
     if (!screenings || screenings.length === 0) {
       return res.json({
         success: true,
-        data: {
-          id: 'scr-demo-default',
-          patientId: req.params.patientId,
-          date: new Date().toISOString().split('T')[0],
-          concern: 'Bruxism & Jaw Health',
-          overallScore: 68,
-          indicationLevel: 'HIGHER CONCERN',
-          summary: 'AI-assisted screening summary',
-          recommendedNextStep: 'Consider scheduling a consultation for an in-person TMJ evaluation.',
-          whyHighlighted: [
-            'Morning jaw tightness reported consistently',
-            'Frequent daytime clenching reported',
-            'Temple discomfort upon waking reported',
-          ],
-        },
+        data: null,
+        history: [],
       });
     }
 

@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const mongoose = require('mongoose');
 const connectDB = require('./config/db');
 
 // Load environment variables
@@ -12,18 +13,41 @@ connectDB();
 const app = express();
 
 // Middleware
-app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3001'],
-  credentials: true,
-}));
-app.use(express.json());
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+      if (!origin) return callback(null, true);
+      if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
+    credentials: true,
+  })
+);
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Health Check Endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'OK',
+    dbConnected: mongoose.connection.readyState === 1,
     message: 'OralSense backend is running',
   });
+});
+
+// Database Readiness Middleware
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health') return next();
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      success: false,
+      message: 'Database connection unavailable',
+    });
+  }
+  next();
 });
 
 // API Routes
@@ -32,6 +56,9 @@ app.use('/api/screenings', require('./routes/screeningRoutes'));
 app.use('/api/providers', require('./routes/providerRoutes'));
 app.use('/api/appointments', require('./routes/appointmentRoutes'));
 app.use('/api/health-updates', require('./routes/healthRoutes'));
+app.use('/api/insurance', require('./routes/insuranceRoutes'));
+app.use('/api/claims', require('./routes/claimRoutes'));
+app.use('/api/dental-habits', require('./routes/dentalHabitsRoutes'));
 
 // 404 Route Handler
 app.use((req, res) => {

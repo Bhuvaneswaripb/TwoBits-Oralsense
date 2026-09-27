@@ -9,7 +9,9 @@ import {
   getStoredPatientHealthUpdates,
   addPatientHealthUpdate,
 } from '@/lib/storage';
+import { getApiScreening, getApiAppointments, getApiClaims, saveApiHealthUpdate } from '@/lib/api';
 import { PatientProfile, ScreeningResult, Appointment, PatientHealthUpdate } from '@/types';
+import { formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -66,12 +68,25 @@ export default function DashboardPage() {
   const [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
 
+  const [apiClaims, setApiClaims] = useState<any[]>([]);
+
   useEffect(() => {
     setMounted(true);
     setProfile(getStoredPatientProfile());
     setScreening(getStoredScreeningResult());
     setAppointments(getStoredAppointments());
     setHealthUpdates(getStoredPatientHealthUpdates());
+
+    // Fetch live MongoDB data
+    getApiScreening().then((scr) => {
+      if (scr) setScreening(scr);
+    });
+    getApiAppointments().then((apts) => {
+      if (apts && apts.length > 0) setAppointments(apts);
+    });
+    getApiClaims().then((clms) => {
+      if (clms) setApiClaims(clms);
+    });
   }, []);
 
   if (!mounted) return null;
@@ -157,7 +172,7 @@ export default function DashboardPage() {
         detail: {
           heading: upcomingApt ? `Appointment with ${upcomingApt.doctorName}` : 'Schedule Dental Visit',
           description: upcomingApt ? `Clinic: ${upcomingApt.clinicName}, ${upcomingApt.clinicAddress}` : 'Book a convenient time with your provider.',
-          metadata: upcomingApt ? `Status: ${upcomingApt.status} • Fee: $${upcomingApt.fee}` : undefined,
+          metadata: upcomingApt ? `Status: ${upcomingApt.status} • Fee: ${formatCurrency(upcomingApt.fee)}` : undefined,
           actionText: upcomingApt ? 'View Booking Details' : 'Book Appointment',
           actionHref: upcomingApt ? '/appointments' : '/find-care',
         },
@@ -236,13 +251,13 @@ export default function DashboardPage() {
       {
         id: 'node-payment',
         title: 'Payment Completed',
-        subtitle: `Demo payment ($${apt.fee})`,
+        subtitle: `Payment (${formatCurrency(apt.fee)})`,
         date: apt.createdAt || 'Completed',
         status: 'completed',
         category: 'Payment',
         detail: {
           heading: 'Demo Payment Confirmation',
-          description: `Consultation fee of $${apt.fee} confirmed under demo patient coverage.`,
+          description: `Consultation fee of ${formatCurrency(apt.fee)} confirmed under demo patient coverage.`,
         },
       },
       {
@@ -302,29 +317,7 @@ export default function DashboardPage() {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/health-updates', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          patientId: 'pat-default',
-          type: newUpdate.type,
-          concern: newUpdate.concern,
-          note: newUpdate.note,
-          shareWithProvider: newUpdate.shareWithProvider,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Backend server returned status ${response.status}`);
-      }
-
-      const resData = await response.json();
-      if (!resData.success) {
-        throw new Error(resData.message || 'Failed to save health update.');
-      }
+      await saveApiHealthUpdate(newUpdate);
 
       const updatedList = addPatientHealthUpdate(newUpdate);
       setHealthUpdates(updatedList);
@@ -630,6 +623,67 @@ export default function DashboardPage() {
               ) : (
                 <div className="p-6 text-center text-xs text-slate-400 italic bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                   No health updates recorded yet. Click "+ Add Health Update" to log changes.
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* INSURANCE & CLAIMS SECTION */}
+          <Card className="p-6 bg-white shadow-subtle border-slate-200 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
+              <div>
+                <h2 className="text-base font-bold text-brand-950 flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-cyan-600" />
+                  INSURANCE & CLAIMS
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Manage your dental coverage, prepare claim documents, and track claim status.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Link href="/insurance">
+                  <Button variant="outline" size="sm" className="text-xs font-bold">
+                    View Coverage
+                  </Button>
+                </Link>
+                <Link href="/insurance">
+                  <Button variant="outline" size="sm" className="text-xs font-bold text-cyan-700 border-cyan-200 hover:bg-cyan-50">
+                    Prepare Claim
+                  </Button>
+                </Link>
+                <Link href="/insurance">
+                  <Button variant="primary" size="sm" className="text-xs font-bold">
+                    Track Claims
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            {/* Recent Claims Preview */}
+            <div className="space-y-3">
+              {apiClaims.length > 0 ? (
+                apiClaims.slice(0, 2).map((c) => (
+                  <div key={c.id || c._id || c.claimReference} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
+                    <div>
+                      <span className="font-mono text-[10px] text-slate-400 font-bold block">CLAIM #{c.claimReference || c.id}</span>
+                      <span className="font-bold text-slate-900">{c.serviceName}</span>
+                      <span className="text-[11px] text-slate-500 block">
+                        {c.clinicName} • Charged: {formatCurrency(c.amountCharged, c.country || 'US')} | Paid: {formatCurrency(c.amountPaid ?? 100, c.country || 'US')}
+                      </span>
+                    </div>
+
+                    <Badge variant={c.status === 'PAID' || c.status === 'APPROVED' ? 'success' : 'primary'} className="text-[10px]">
+                      {c.status}
+                    </Badge>
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
+                  <span>No active claims logged yet.</span>
+                  <Link href="/insurance">
+                    <span className="text-brand-700 font-bold hover:underline cursor-pointer">Prepare Claim →</span>
+                  </Link>
                 </div>
               )}
             </div>

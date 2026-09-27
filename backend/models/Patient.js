@@ -12,9 +12,18 @@ const patientSchema = new mongoose.Schema({
     trim: true,
     lowercase: true,
   },
+  dateOfBirth: {
+    type: String,
+    default: '1997-05-15',
+  },
   age: {
     type: Number,
     default: 29,
+  },
+  mode: {
+    type: String,
+    enum: ['kid', 'adult'],
+    default: 'adult',
   },
   country: {
     type: String,

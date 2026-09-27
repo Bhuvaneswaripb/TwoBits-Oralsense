@@ -173,12 +173,12 @@ export const InsuranceCoverageWidget: React.FC<InsuranceCoverageWidgetProps> = (
         <div className="grid grid-cols-2 gap-3 text-xs pt-1 border-t border-slate-100">
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase">Standard Fee</span>
-            <div className="font-bold text-slate-800">{formatCurrency(baseConsultationFee)}</div>
+            <div className="font-bold text-slate-800">{formatCurrency(baseConsultationFee, selectedRegion)}</div>
           </div>
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase">Estimated Patient Out-of-Pocket</span>
             <div className="font-extrabold text-brand-900 text-sm">
-              {formatCurrency(currentEstimate.estimatedOutofPocket)}
+              {formatCurrency(currentEstimate.estimatedOutofPocket, selectedRegion)}
             </div>
           </div>
         </div>

@@ -6,6 +6,7 @@ import confetti from 'canvas-confetti';
 import { MOCK_DOCTORS } from '@/data/mockData';
 import { Appointment, ConcernType } from '@/types';
 import { addAppointment, getStoredScreeningResult } from '@/lib/storage';
+import { createApiAppointment, getApiInsuranceProfile } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -40,6 +41,21 @@ function BookingContent() {
   const [confirmedApt, setConfirmedApt] = useState<Appointment | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
+  const [insuranceProfile, setInsuranceProfile] = useState<any | null>(null);
+  const [isLoadingInsurance, setIsLoadingInsurance] = useState<boolean>(true);
+
+  useEffect(() => {
+    getApiInsuranceProfile('pat-default')
+      .then((data) => {
+        setInsuranceProfile(data);
+      })
+      .catch(() => {
+        setInsuranceProfile(null);
+      })
+      .finally(() => {
+        setIsLoadingInsurance(false);
+      });
+  }, []);
 
   // Simple Insurance Calculation for Booking
   const estOutofPocket = paymentOption === 'ppo' 
@@ -87,42 +103,12 @@ function BookingContent() {
       createdAt: new Date().toISOString().split('T')[0],
     };
 
-    // Send POST request to backend API
     try {
-      const response = await fetch('http://localhost:5000/api/appointments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          patientId: 'pat-default',
-          providerId: doctor.id,
-          doctorName: doctor.name,
-          doctorSpecialty: doctor.specialty,
-          doctorImage: doctor.image,
-          clinicName: doctor.clinic,
-          clinicAddress: doctor.clinicAddress,
-          service: isServiceBooking ? serviceParam : 'Dental Consultation',
-          concern: activeConcern,
-          date: initialDate,
-          time: initialSlot,
-          consultationType: 'In-Person',
-          bookingSource: isServiceBooking ? 'direct-service' : 'screening',
-          fee: doctor.consultationFee,
-          estimatedCoverage: doctor.consultationFee - estOutofPocket,
-          patientNotes,
-        }),
+      await createApiAppointment({
+        ...newApt,
+        insuranceProfileId: insuranceProfile?._id || insuranceProfile?.id || null,
       });
 
-      if (!response.ok) {
-        const errorJson = await response.json().catch(() => null);
-        const errMsg = errorJson?.message || `Server returned error (${response.status})`;
-        setBookingError(`Booking failed: ${errMsg}`);
-        setIsSubmitting(false);
-        return;
-      }
-
-      // API request succeeded -> save locally for Journey UI & render confirmation
       addAppointment(newApt);
       setConfirmedApt(newApt);
 
@@ -136,7 +122,7 @@ function BookingContent() {
         // ignore
       }
     } catch (err: any) {
-      setBookingError(`Connection error: Unable to reach backend server at http://localhost:5000 (${err.message}).`);
+      setBookingError(`Connection error: Unable to reach backend server (${err.message}).`);
     } finally {
       setIsSubmitting(false);
     }
@@ -229,15 +215,58 @@ function BookingContent() {
           <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-200 pb-2">
               <span className="text-xs font-bold uppercase tracking-wider text-brand-950 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-cyan-600" /> Step 3: Coverage / Cost Estimate
+                <ShieldCheck className="w-4 h-4 text-cyan-600" /> Step 3: Saved Insurance & Coverage
               </span>
               <Badge variant="secondary" className="text-[10px] bg-cyan-100 text-cyan-800 font-bold">
-                DEMO ESTIMATE
+                {insuranceProfile ? 'INSURANCE FOUND' : 'NO INSURANCE'}
               </Badge>
             </div>
 
+            {/* Display user's retrieved insurance profile */}
+            {isLoadingInsurance ? (
+              <div className="p-4 rounded-2xl bg-white border border-slate-200 text-xs text-slate-500 text-center">
+                Loading saved insurance profile...
+              </div>
+            ) : insuranceProfile && insuranceProfile.provider ? (
+              <div className="p-4 rounded-2xl bg-cyan-50/90 border border-cyan-200/90 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-cyan-950 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-cyan-600" /> Insurance Profile
+                  </span>
+                  <Badge variant="success" className="text-[10px] bg-emerald-100 text-emerald-800 border-emerald-200">
+                    Active Coverage
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-800 pt-1">
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Provider</span>
+                    <span className="font-extrabold text-slate-900">{insuranceProfile.provider}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Plan</span>
+                    <span className="font-extrabold text-slate-900">{insuranceProfile.planName || 'Standard Dental Plan'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase block">Coverage</span>
+                    <span className="font-extrabold text-cyan-900">{insuranceProfile.coverageType || 'Dental Coverage'}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-white border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
+                <span>No insurance information saved</span>
+                <button
+                  type="button"
+                  onClick={() => router.push('/insurance')}
+                  className="text-brand-600 font-bold text-xs hover:underline cursor-pointer"
+                >
+                  Add Insurance
+                </button>
+              </div>
+            )}
+
             <div className="space-y-2 text-xs">
-              <label className="font-bold text-slate-700 block">Select Insurance / Payment Option</label>
+              <label className="font-bold text-slate-700 block">Select Payment / Rebate Preference</label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <button
                   type="button"

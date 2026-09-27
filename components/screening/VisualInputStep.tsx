@@ -5,28 +5,83 @@ import { VisualInputConfig, AttachedVisualInput } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Camera, Video, Upload, Check, X, ShieldCheck, Info, AlertCircle, RefreshCw, Play, Square } from 'lucide-react';
+import {
+  Camera,
+  Upload,
+  Check,
+  X,
+  ShieldCheck,
+  Info,
+  AlertCircle,
+  RefreshCw,
+  Video,
+  ChevronRight,
+} from 'lucide-react';
+
+export type ViewType = 'Front' | 'Left' | 'Right' | 'Upper' | 'Lower';
+
+export interface ViewInput {
+  type: ViewType;
+  label: string;
+  instruction: string;
+  dataUrl?: string;
+  fileName?: string;
+  timestamp?: string;
+}
 
 interface VisualInputStepProps {
   config: VisualInputConfig;
-  onContinue: (attachedMedia?: AttachedVisualInput) => void;
+  onContinue: (attachedMedia?: AttachedVisualInput | any) => void;
   onSkip: () => void;
 }
 
-export const VisualInputStep: React.FC<VisualInputStepProps> = ({
-  config,
-  onContinue,
-  onSkip,
-}) => {
-  const [attachedMedia, setAttachedMedia] = useState<AttachedVisualInput | null>(null);
+const FIVE_VIEWS: { type: ViewType; label: string; instruction: string }[] = [
+  {
+    type: 'Front',
+    label: '1. Front View',
+    instruction: 'Capture the front of your teeth with good lighting.',
+  },
+  {
+    type: 'Left',
+    label: '2. Left View',
+    instruction: 'Capture the left side of your teeth.',
+  },
+  {
+    type: 'Right',
+    label: '3. Right View',
+    instruction: 'Capture the right side of your teeth.',
+  },
+  {
+    type: 'Upper',
+    label: '4. Upper View',
+    instruction: 'Capture the upper teeth from an inside/below angle.',
+  },
+  {
+    type: 'Lower',
+    label: '5. Lower View',
+    instruction: 'Capture the lower teeth from an inside/above angle.',
+  },
+];
+
+export const VisualInputStep: React.FC<VisualInputStepProps> = ({ config, onContinue, onSkip }) => {
+  const [activeViewIndex, setActiveViewIndex] = useState(0);
+  const [viewInputs, setViewInputs] = useState<Record<ViewType, ViewInput>>({
+    Front: { type: 'Front', label: 'Front View', instruction: FIVE_VIEWS[0].instruction },
+    Left: { type: 'Left', label: 'Left View', instruction: FIVE_VIEWS[1].instruction },
+    Right: { type: 'Right', label: 'Right View', instruction: FIVE_VIEWS[2].instruction },
+    Upper: { type: 'Upper', label: 'Upper View', instruction: FIVE_VIEWS[3].instruction },
+    Lower: { type: 'Lower', label: 'Lower View', instruction: FIVE_VIEWS[4].instruction },
+  });
+
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const currentViewConfig = FIVE_VIEWS[activeViewIndex];
+  const currentViewData = viewInputs[currentViewConfig.type];
 
   useEffect(() => {
     return () => {
@@ -45,12 +100,12 @@ export const VisualInputStep: React.FC<VisualInputStepProps> = ({
   const startCamera = async () => {
     setCameraError(null);
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Browser camera API is not available.');
+      if (typeof window === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera API is not supported in this browser environment.');
       }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: config.mediaType === 'video',
+        audio: false,
       });
       mediaStreamRef.current = stream;
       setIsCameraActive(true);
@@ -62,8 +117,8 @@ export const VisualInputStep: React.FC<VisualInputStepProps> = ({
         }
       }, 100);
     } catch (err: any) {
-      console.warn('Camera access error, falling back to file upload:', err);
-      setCameraError('Camera access unavailable or declined. Please choose a photo/video file from your device.');
+      console.warn('Camera access issue:', err.message);
+      setCameraError('Camera access unavailable or declined. Please choose a photo file from your device.');
       stopCameraStream();
     }
   };
@@ -77,219 +132,209 @@ export const VisualInputStep: React.FC<VisualInputStepProps> = ({
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg');
-      setPreviewUrl(dataUrl);
 
-      const captured: AttachedVisualInput = {
-        type: 'photo',
-        fileUrl: dataUrl,
-        fileName: `dental_photo_${Date.now().toString().slice(-4)}.jpg`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setAttachedMedia(captured);
+      setViewInputs((prev) => ({
+        ...prev,
+        [currentViewConfig.type]: {
+          ...prev[currentViewConfig.type],
+          dataUrl,
+          fileName: `${currentViewConfig.type.toLowerCase()}_teeth_view.jpg`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      }));
       stopCameraStream();
     }
-  };
-
-  const simulateRecordVideo = () => {
-    setIsRecording(true);
-    setTimeout(() => {
-      setIsRecording(false);
-      const captured: AttachedVisualInput = {
-        type: 'video',
-        fileUrl: 'sample_jaw_movement.mp4',
-        fileName: `jaw_movement_recording_${Date.now().toString().slice(-4)}.mp4`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setAttachedMedia(captured);
-      setPreviewUrl('sample_jaw_movement.mp4');
-      stopCameraStream();
-    }, 2500);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-      const isVideo = file.type.startsWith('video');
-      const uploaded: AttachedVisualInput = {
-        type: isVideo ? 'video' : 'photo',
-        fileUrl: url,
-        fileName: file.name,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const url = event.target?.result as string;
+        setViewInputs((prev) => ({
+          ...prev,
+          [currentViewConfig.type]: {
+            ...prev[currentViewConfig.type],
+            dataUrl: url,
+            fileName: file.name,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+        }));
+        stopCameraStream();
       };
-      setAttachedMedia(uploaded);
-      stopCameraStream();
+      reader.readAsDataURL(file);
     }
   };
 
-  const handleRemoveMedia = () => {
-    setAttachedMedia(null);
-    setPreviewUrl(null);
+  const handleRemoveView = (type: ViewType) => {
+    setViewInputs((prev) => ({
+      ...prev,
+      [type]: {
+        ...prev[type],
+        dataUrl: undefined,
+        fileName: undefined,
+        timestamp: undefined,
+      },
+    }));
     stopCameraStream();
   };
 
-  if (config.mediaType === 'none') {
-    return (
-      <Card className="p-8 shadow-premium border-brand-100 bg-white text-center space-y-6">
-        <div className="w-16 h-16 rounded-2xl bg-cyan-50 text-cyan-700 flex items-center justify-center mx-auto">
-          <Info className="w-8 h-8" />
-        </div>
-        <div className="space-y-2">
-          <Badge variant="primary">NO VISUAL INPUT REQUIRED</Badge>
-          <h2 className="text-2xl font-bold text-slate-900">{config.title}</h2>
-          <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto">{config.description}</p>
-        </div>
-        <Button variant="primary" size="lg" onClick={() => onContinue(undefined)}>
-          Proceed to AI Analysis Summary
-        </Button>
-      </Card>
-    );
-  }
+  const capturedCount = Object.values(viewInputs).filter((v) => Boolean(v.dataUrl)).length;
+
+  const handleCompleteScreening = () => {
+    const validViews = Object.values(viewInputs).filter((v) => Boolean(v.dataUrl));
+    if (validViews.length === 0) {
+      onContinue(undefined);
+      return;
+    }
+
+    const payload: AttachedVisualInput = {
+      type: 'photo',
+      fileUrl: validViews[0].dataUrl || '',
+      fileName: validViews.length === 1 ? `${validViews[0].type} View Photo` : `${validViews.length} Dental Photo Views`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      // Additional metadata
+      views: validViews,
+      photoCount: validViews.length,
+    } as any;
+
+    onContinue(payload);
+  };
 
   return (
     <Card className="p-6 sm:p-10 shadow-premium border-brand-100 bg-white space-y-6">
-      
       {/* Header */}
       <div className="space-y-2 text-center sm:text-left border-b border-slate-100 pb-4">
         <div className="flex items-center gap-2 justify-center sm:justify-start">
           <Badge variant="primary" className="bg-cyan-100 text-cyan-800 border-cyan-200">
-            OPTIONAL VISUAL CHECK
+            OPTIONAL FIVE-DIRECTION VISUAL CAPTURE
           </Badge>
-          <Badge variant="neutral" className="text-[10px] uppercase">
-            {config.mediaType} INPUT
+          <Badge variant="neutral" className="text-[10px] uppercase font-mono">
+            {capturedCount} OF 5 VIEWS CAPTURED
           </Badge>
         </div>
 
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-          {config.title}
-        </h2>
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-900">Five-Direction Visual Capture</h2>
 
         <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-          {config.description}
+          Provide optional photos of your teeth from up to five directions to help organize details for your dentist.
         </p>
       </div>
 
-      {/* Capture Guidance Box */}
-      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2 text-xs text-slate-700">
-        <div className="font-bold text-brand-950 flex items-center gap-1.5">
-          <Info className="w-4 h-4 text-cyan-600" />
-          Capture & Lighting Guidance
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-600 pl-1">
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 shrink-0" />
-            <span>Use good room lighting</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 shrink-0" />
-            <span>Keep the camera steady</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 shrink-0" />
-            <span>Avoid camera flash glare</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 shrink-0" />
-            <span>Only upload media relevant to your dental concern</span>
-          </div>
-        </div>
+      {/* View Selector Tabs */}
+      <div className="grid grid-cols-5 gap-1.5 p-1.5 bg-slate-100 rounded-2xl border border-slate-200">
+        {FIVE_VIEWS.map((v, idx) => {
+          const hasImage = Boolean(viewInputs[v.type].dataUrl);
+          const isActive = idx === activeViewIndex;
+
+          return (
+            <button
+              key={v.type}
+              type="button"
+              onClick={() => {
+                stopCameraStream();
+                setActiveViewIndex(idx);
+              }}
+              className={`py-2 px-1 rounded-xl text-center transition-all flex flex-col items-center justify-center gap-1 ${
+                isActive
+                  ? 'bg-brand-900 text-white shadow-sm font-bold'
+                  : hasImage
+                  ? 'bg-emerald-50 text-emerald-900 border border-emerald-300 font-semibold'
+                  : 'text-slate-600 hover:bg-white'
+              }`}
+            >
+              <span className="text-[11px] sm:text-xs tracking-tight">{v.type}</span>
+              {hasImage ? (
+                <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white flex items-center justify-center">
+                  <Check className="w-2.5 h-2.5 stroke-[3]" />
+                </div>
+              ) : (
+                <div className="w-2 h-2 rounded-full bg-slate-300" />
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Camera / Upload Container */}
+      {/* Active View Title & Instruction */}
+      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1">
+        <div className="font-extrabold text-brand-950 uppercase tracking-wide flex items-center gap-2">
+          <span>{currentViewConfig.label}</span>
+          {viewInputs[currentViewConfig.type].dataUrl && (
+            <Badge variant="success" className="text-[10px]">
+              CAPTURED
+            </Badge>
+          )}
+        </div>
+        <p className="text-slate-600">{currentViewConfig.instruction}</p>
+      </div>
+
+      {/* Camera / Photo Upload Box */}
       <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 text-white text-center space-y-4 relative overflow-hidden border border-slate-800">
-        
-        {/* State 1: Live Camera Active */}
         {isCameraActive ? (
+          /* Live Camera Stream */
           <div className="space-y-4">
             <div className="relative rounded-2xl overflow-hidden bg-black max-w-md mx-auto aspect-video border border-slate-700">
               <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
-              {isRecording && (
-                <div className="absolute top-3 left-3 bg-rose-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 animate-pulse">
-                  <Square className="w-2.5 h-2.5 fill-white" /> RECORDING JAW MOVEMENT...
-                </div>
-              )}
             </div>
 
             <div className="flex items-center justify-center gap-3">
-              {config.mediaType === 'video' ? (
-                <Button
-                  variant="primary"
-                  size="md"
-                  disabled={isRecording}
-                  onClick={simulateRecordVideo}
-                  className="bg-rose-600 hover:bg-rose-700 text-white font-bold border-0"
-                  icon={<Video className="w-4 h-4" />}
-                >
-                  {isRecording ? 'Recording (5s)...' : 'Start 5s Video Recording'}
-                </Button>
-              ) : (
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={capturePhoto}
-                  className="bg-cyan-500 hover:bg-cyan-400 text-brand-950 font-bold border-0"
-                  icon={<Camera className="w-4 h-4" />}
-                >
-                  Capture Photo
-                </Button>
-              )}
+              <Button
+                variant="primary"
+                size="md"
+                onClick={capturePhoto}
+                className="bg-cyan-500 hover:bg-cyan-400 text-brand-950 font-bold border-0"
+                icon={<Camera className="w-4 h-4" />}
+              >
+                Capture {currentViewConfig.type} View Photo
+              </Button>
 
               <Button variant="ghost" size="sm" onClick={stopCameraStream} className="text-slate-300">
                 Cancel
               </Button>
             </div>
           </div>
-        ) : attachedMedia ? (
-          /* State 2: Media Captured / Uploaded Preview */
+        ) : currentViewData.dataUrl ? (
+          /* Image Preview & Retake / Remove Options */
           <div className="space-y-4 py-2 animate-in fade-in duration-300">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
-              <Check className="w-7 h-7 stroke-[3]" />
+            <div className="max-w-xs mx-auto rounded-2xl overflow-hidden border-2 border-cyan-400 bg-black p-1 shadow-lg">
+              <img src={currentViewData.dataUrl} alt={`${currentViewConfig.type} view`} className="w-full h-44 object-cover rounded-xl" />
             </div>
 
             <div className="space-y-1">
-              <Badge variant="success">VISUAL INPUT ATTACHED</Badge>
-              <div className="text-sm font-bold text-white">{attachedMedia.fileName}</div>
-              <div className="text-xs text-slate-400">Recorded/Uploaded at {attachedMedia.timestamp}</div>
+              <div className="text-sm font-bold text-white">{currentViewConfig.type} View Attached</div>
+              <div className="text-xs text-slate-400">Recorded at {currentViewData.timestamp}</div>
             </div>
 
-            {previewUrl && (
-              <div className="max-w-xs mx-auto rounded-xl overflow-hidden border border-slate-700 bg-black p-1">
-                {attachedMedia.type === 'photo' && previewUrl.startsWith('data:') ? (
-                  <img src={previewUrl} alt="Preview" className="w-full h-36 object-cover rounded-lg" />
-                ) : (
-                  <div className="p-4 bg-slate-800 rounded-lg text-xs text-slate-300 flex items-center justify-center gap-2">
-                    <Video className="w-5 h-5 text-cyan-400" />
-                    <span>Video Clip Ready</span>
-                  </div>
-                )}
-              </div>
-            )}
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={startCamera}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 text-xs font-semibold text-cyan-300 hover:bg-white/20 transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Retake Photo
+              </button>
 
-            <button
-              type="button"
-              onClick={handleRemoveMedia}
-              className="text-xs text-rose-400 hover:underline inline-flex items-center gap-1 font-semibold"
-            >
-              <X className="w-4 h-4" /> Remove / Retake Media
-            </button>
+              <button
+                type="button"
+                onClick={() => handleRemoveView(currentViewConfig.type)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/20 text-xs font-semibold text-rose-300 hover:bg-rose-500/30 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" /> Remove View
+              </button>
+            </div>
           </div>
         ) : (
-          /* State 3: Choice Buttons (Take Photo vs Upload Photo) */
+          /* Empty / Capture Trigger */
           <div className="space-y-5 py-4">
             <div className="w-16 h-16 rounded-2xl bg-white/10 text-cyan-400 flex items-center justify-center mx-auto shadow-inner">
-              {config.mediaType === 'video' ? <Video className="w-8 h-8" /> : <Camera className="w-8 h-8" />}
+              <Camera className="w-8 h-8" />
             </div>
 
             <div className="space-y-1">
-              <div className="text-base font-bold text-white">
-                {config.mediaType === 'video'
-                  ? 'Record or Upload Jaw Movement Video'
-                  : 'Take or Upload Photo'}
-              </div>
-              <div className="text-xs text-slate-400">
-                Visual input is optional and assists your dentist during consultation.
-              </div>
+              <div className="text-base font-bold text-white">Capture or Upload {currentViewConfig.type} View</div>
+              <div className="text-xs text-slate-400">{currentViewConfig.instruction}</div>
             </div>
 
             {cameraError && (
@@ -305,9 +350,9 @@ export const VisualInputStep: React.FC<VisualInputStepProps> = ({
                 size="md"
                 onClick={startCamera}
                 className="bg-cyan-500 hover:bg-cyan-400 text-brand-950 font-bold border-0 text-xs w-full sm:w-auto"
-                icon={config.mediaType === 'video' ? <Video className="w-4 h-4" /> : <Camera className="w-4 h-4" />}
+                icon={<Camera className="w-4 h-4" />}
               >
-                Option A: {config.mediaType === 'video' ? 'Record Video' : 'Take Photo'}
+                Camera (Take Photo)
               </Button>
 
               <button
@@ -316,47 +361,55 @@ export const VisualInputStep: React.FC<VisualInputStepProps> = ({
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-white/20 text-xs font-semibold text-slate-200 hover:bg-white/10 transition-colors"
               >
                 <Upload className="w-4 h-4 text-cyan-400" />
-                Option B: Upload {config.mediaType === 'video' ? 'Video File' : 'Photo File'}
+                Upload Photo File
               </button>
 
               <input
                 ref={fileInputRef}
                 type="file"
-                accept={config.mediaType === 'video' ? 'video/*' : 'image/*'}
+                accept="image/*"
                 className="hidden"
                 onChange={handleFileUpload}
               />
             </div>
           </div>
         )}
-
       </div>
 
-      {/* Privacy Notice Box */}
+      {/* Mandatory Privacy Notice */}
       <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500 space-y-1">
         <div className="font-bold text-slate-700 flex items-center gap-1">
           <ShieldCheck className="w-4 h-4 text-emerald-600" /> Privacy & Data Control
         </div>
-        <p>
-          "Your screening media is stored locally and shared with a dental professional only when you choose to share it."
-        </p>
+        <p>"Your screening media is stored locally and shared with a dental professional only when you choose to share it."</p>
       </div>
 
-      {/* Action Footer */}
+      {/* Navigation Footer */}
       <div className="flex items-center justify-between pt-4 border-t border-slate-100">
         <Button variant="ghost" size="sm" onClick={onSkip} className="text-xs text-slate-500 hover:text-slate-800">
           Skip Visual Check
         </Button>
 
-        <Button
-          variant="primary"
-          size="md"
-          onClick={() => onContinue(attachedMedia || undefined)}
-        >
-          {attachedMedia ? 'Continue to AI Analysis' : 'Proceed Without Visual Check'}
-        </Button>
-      </div>
+        <div className="flex items-center gap-2">
+          {activeViewIndex < FIVE_VIEWS.length - 1 ? (
+            <Button
+              variant="outline"
+              size="md"
+              onClick={() => {
+                stopCameraStream();
+                setActiveViewIndex((prev) => prev + 1);
+              }}
+              icon={<ChevronRight className="w-4 h-4" />}
+            >
+              Next View ({FIVE_VIEWS[activeViewIndex + 1].type})
+            </Button>
+          ) : null}
 
+          <Button variant="primary" size="md" onClick={handleCompleteScreening}>
+            {capturedCount > 0 ? `Continue with ${capturedCount} Photo${capturedCount > 1 ? 's' : ''}` : 'Proceed Without Visual Check'}
+          </Button>
+        </div>
+      </div>
     </Card>
   );
 };

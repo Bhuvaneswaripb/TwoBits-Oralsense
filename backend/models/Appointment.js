@@ -93,6 +93,11 @@ const appointmentSchema = new mongoose.Schema({
     type: Number,
     default: 180,
   },
+  insuranceProfileId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'InsuranceProfile',
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

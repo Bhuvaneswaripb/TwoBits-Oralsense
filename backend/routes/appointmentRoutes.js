@@ -22,6 +22,7 @@ router.post('/', async (req, res) => {
       fee,
       estimatedCoverage,
       patientNotes,
+      insuranceProfileId,
     } = req.body;
 
     if (!providerId || !date || !time) {
@@ -55,6 +56,7 @@ router.post('/', async (req, res) => {
       paymentStatus: 'pending',
       paymentAmount: patientResponsibility,
       patientNotes: patientNotes || '',
+      insuranceProfileId: insuranceProfileId || null,
       status: 'Upcoming',
     });
 

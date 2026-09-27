@@ -165,6 +165,8 @@ export interface PatientProfile {
   email: string;
   phone: string;
   age: number;
+  dateOfBirth?: string;
+  mode?: 'kid' | 'adult';
   gender: string;
   location: string;
   mouthguardConnected: boolean;
@@ -267,7 +269,181 @@ export interface PracticePatient {
   followUpStatus: 'Due' | 'Completed' | 'Pending';
   timelineStage: 'Screening' | 'Appointment' | 'Clinical Assessment' | 'Monitoring' | 'Follow-Up';
   clinicalNotes: ClinicalNote[];
-  symptomHistory: SymptomLogEntry[];
   patientHealthUpdates?: PatientHealthUpdate[];
+  symptomHistory?: SymptomLogEntry[];
+}
+
+export interface InsuranceProfile {
+  id?: string;
+  _id?: string;
+  patientId?: string;
+  country: string;
+  provider: string;
+  planName: string;
+  memberId: string;
+  policyNumber: string;
+  coverageType: string;
+  policyStartDate: string;
+  policyEndDate: string;
+  dentalCoverage: string[];
+  annualLimit: number;
+  remainingBenefit: number;
+  deductible?: number;
+  copayment?: number;
+  waitingPeriod: string;
+  preAuthorizationRequired: 'Yes' | 'No' | 'Unknown';
+  isUserProvided?: boolean;
+}
+
+export interface ClaimDocument {
+  id?: string;
+  name: string;
+  type: string;
+  status: 'Uploaded' | 'Missing' | 'Not Required';
+  fileUrl?: string;
+  uploadedAt?: string;
+}
+
+export interface DentalClaim {
+  id?: string;
+  _id?: string;
+  patientId?: string;
+  insuranceProfileId?: string;
+  insuranceProvider: string;
+  planName?: string;
+  memberId?: string;
+  policyNumber?: string;
+  providerName: string;
+  clinicName: string;
+  dentistName?: string;
+  treatmentDate: string;
+  serviceName: string;
+  description?: string;
+  amountCharged: number;
+  amountPaid: number;
+  paymentMethod?: string;
+  claimReference: string;
+  preAuthNumber?: string;
+  status:
+    | 'DRAFT'
+    | 'DOCUMENTS NEEDED'
+    | 'READY TO SUBMIT'
+    | 'SUBMITTED'
+    | 'UNDER REVIEW'
+    | 'APPROVED'
+    | 'PARTIALLY REIMBURSED'
+    | 'REJECTED'
+    | 'PAID';
+  documents: ClaimDocument[];
+  submittedAt?: string;
+  createdAt?: string;
+}
+
+export interface ChildProfile {
+  id?: string;
+  _id?: string;
+  userId: string;
+  name: string;
+  age: number;
+  avatar: string;
+  morningReminderTime?: string;
+  eveningReminderTime?: string;
+  createdAt?: string;
+}
+
+export interface DentalHabitLog {
+  id?: string;
+  _id?: string;
+  userId: string;
+  childId: string;
+  date: string; // YYYY-MM-DD
+  morningBrushing: boolean;
+  morningTongue: boolean;
+  eveningBrushing: boolean;
+  eveningFloss: boolean;
+  totalBrushingSeconds?: number;
+  completedSessions?: number;
+}
+
+export interface BrushReplacement {
+  id?: string;
+  _id?: string;
+  userId: string;
+  childId: string;
+  lastReplacementDate: string; // YYYY-MM-DD
+  nextReminderDate: string; // YYYY-MM-DD (calculated 3 months out)
+  notes?: string;
+}
+
+export interface DentalProduct {
+  id: string;
+  name: string;
+  category: "Children's Toothbrushes" | "Electric Toothbrushes" | "Toothpaste" | "Flossers" | "Replacement Brush Heads";
+  ageRange: string;
+  description: string;
+  price: number;
+  image?: string;
+  recommendedFor: string;
+  learnMoreUrl?: string;
+  isDemoItem?: boolean;
+  features?: string[];
+  inStock?: boolean;
+  currency?: string;
+  rating?: number;
+  reviewCount?: number;
+}
+
+export interface CartItem {
+  product: DentalProduct;
+  quantity: number;
+}
+
+export interface ShippingDetails {
+  fullName: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+}
+
+export interface DentalOrder {
+  orderId: string;
+  date: string;
+  items: CartItem[];
+  subtotal: number;
+  deliveryFee: number;
+  total: number;
+  shippingDetails: ShippingDetails;
+  status: 'Confirmed' | 'Dispatched' | 'Delivered';
+}
+
+export interface AchievementBadge {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  unlocked: boolean;
+  unlockedAt?: string;
+  points: number;
+}
+
+export interface WeeklyHabitReport {
+  childName: string;
+  childAge: number;
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+  morningBrushingPercent: number;
+  eveningBrushingPercent: number;
+  flossingPercent: number;
+  tongueCleaningPercent: number;
+  avgBrushingSeconds: number;
+  currentStreak: number;
+  bestStreak: number;
+  weeklyConsistencyPercent: number;
+  insights: string[];
+  areasToImprove?: string[];
 }
 

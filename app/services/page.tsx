@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { ArrowRight, ShieldCheck, Globe, Info, Sparkles, CheckCircle2 } from 'lucide-react';
 import { CATEGORIZED_DENTAL_SERVICES } from '@/data/mockData';
 import { InsuranceRegion } from '@/types';
+import { formatCurrency } from '@/lib/utils';
 
 export default function ServicesPage() {
   const [selectedRegion, setSelectedRegion] = useState<InsuranceRegion>('US');
@@ -150,7 +151,7 @@ export default function ServicesPage() {
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 uppercase font-bold">Estimated Patient Cost</span>
-                <div className="font-extrabold text-cyan-300">$20 – $40 copay</div>
+                <div className="font-extrabold text-cyan-300">{formatCurrency(25, 'US')} copay</div>
               </div>
             </div>
           </div>
@@ -165,11 +166,11 @@ export default function ServicesPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div>
                 <span className="text-[10px] text-slate-400 uppercase font-bold">NHS Band 1 Diagnosis</span>
-                <div className="font-semibold text-white">£26.80 fixed NHS fee</div>
+                <div className="font-semibold text-white">{formatCurrency(26.8, 'UK')} fixed NHS fee</div>
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 uppercase font-bold">Private Dental Consultation</span>
-                <div className="font-semibold text-white">£60 – £120 demo estimate</div>
+                <div className="font-semibold text-white">{formatCurrency(60, 'UK')} – {formatCurrency(120, 'UK')} demo estimate</div>
               </div>
             </div>
             <p className="text-[11px] text-slate-300 italic">
@@ -191,11 +192,11 @@ export default function ServicesPage() {
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 uppercase font-bold">Estimated Rebate</span>
-                <div className="font-semibold text-emerald-400">Demo rebate ($80–$120)</div>
+                <div className="font-semibold text-emerald-400">Demo rebate ({formatCurrency(80, 'Australia')}–{formatCurrency(120, 'Australia')})</div>
               </div>
               <div>
                 <span className="text-[10px] text-slate-400 uppercase font-bold">Estimated Gap</span>
-                <div className="font-extrabold text-cyan-300">$30 demo estimate gap</div>
+                <div className="font-extrabold text-cyan-300">{formatCurrency(30, 'Australia')} demo estimate gap</div>
               </div>
             </div>
           </div>

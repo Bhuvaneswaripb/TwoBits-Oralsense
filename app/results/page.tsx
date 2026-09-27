@@ -42,7 +42,7 @@ export default function ResultsPage() {
             Please complete an AI-assisted screening to generate your summary.
           </p>
           <Link href="/screening">
-            <Button variant="primary" size="md" font-bold>
+            <Button variant="primary" size="md" className="font-bold">
               Start Free Screening
             </Button>
           </Link>
@@ -144,9 +144,11 @@ Disclaimer: OralSense provides an early screening summary for informational purp
                 <Camera className="w-5 h-5 text-cyan-400 shrink-0" />
               )}
               <div>
-                <div className="font-bold text-white">Visual input received ({result.visualInputType})</div>
+                <div className="font-bold text-white">
+                  Visual input received ({result.visualInputType || 'photo'})
+                </div>
                 <div className="text-[11px] text-slate-300">
-                  Your photo/video helps organize information for discussion with a dental professional.
+                  Your visual input helps organize information for discussion with a dental professional.
                 </div>
               </div>
             </div>

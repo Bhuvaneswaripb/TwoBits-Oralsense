@@ -15,10 +15,43 @@ const screeningSchema = new mongoose.Schema({
     min: 0,
     max: 100,
   },
+  overallScore: {
+    type: Number,
+    min: 0,
+    max: 100,
+  },
   indicationLevel: {
     type: String,
     enum: ['LOWER CONCERN', 'MODERATE CONCERN', 'HIGHER CONCERN'],
     default: 'MODERATE CONCERN',
+  },
+  safety: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {},
+  },
+  symptoms: {
+    type: [String],
+    default: [],
+  },
+  answers: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {},
+  },
+  visualInputs: {
+    type: [mongoose.Schema.Types.Mixed],
+    default: [],
+  },
+  hasVisualInput: {
+    type: Boolean,
+    default: false,
+  },
+  visualInputType: {
+    type: String,
+    default: '',
+  },
+  whyHighlighted: {
+    type: [String],
+    default: [],
   },
   summary: {
     type: String,
@@ -27,6 +60,10 @@ const screeningSchema = new mongoose.Schema({
   recommendedNextStep: {
     type: String,
     default: 'Consider discussing these symptoms with a dental professional during your consultation.',
+  },
+  recommendations: {
+    type: [String],
+    default: [],
   },
   createdAt: {
     type: Date,

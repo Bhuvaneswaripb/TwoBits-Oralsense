@@ -7,8 +7,9 @@ import { ConcernType, Question, ScreeningAnswers, ScreeningResult, AttachedVisua
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { Check, ArrowRight, ArrowLeft, AlertCircle, Sparkles, ShieldCheck } from 'lucide-react';
+import { Check, ArrowRight, ArrowLeft, AlertCircle } from 'lucide-react';
 import { saveScreeningResult } from '@/lib/storage';
+import { saveApiScreening } from '@/lib/api';
 import { UrgentCheckStep } from '@/components/screening/UrgentCheckStep';
 import { VisualInputStep } from '@/components/screening/VisualInputStep';
 import { AnalysisLoader } from '@/components/screening/AnalysisLoader';
@@ -29,6 +30,7 @@ function UnifiedScreeningContent() {
 
   const [selectedConcern, setSelectedConcern] = useState<ConcernType>(validConcern);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [safetyResponses, setSafetyResponses] = useState<string[]>([]);
   const [answers, setAnswers] = useState<ScreeningAnswers>({});
   const [attachedMedia, setAttachedMedia] = useState<AttachedVisualInput | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,6 +48,11 @@ function UnifiedScreeningContent() {
     setCurrentQuestionIndex(0);
     setAnswers({});
     setCurrentStep('urgent');
+  };
+
+  const handleUrgentComplete = (selectedItems: string[]) => {
+    setSafetyResponses(selectedItems);
+    setCurrentStep('questions');
   };
 
   const handleSelectOption = (value: number) => {
@@ -83,13 +90,21 @@ function UnifiedScreeningContent() {
     });
 
     const maxPoints = totalQuestions * 4;
-    const rawScore = Math.round((totalPoints / Math.max(1, maxPoints)) * 100);
+    let rawScore = Math.round((totalPoints / Math.max(1, maxPoints)) * 100);
+    if (safetyResponses.length > 0) {
+      rawScore = Math.min(100, rawScore + safetyResponses.length * 15);
+    }
 
     let indicationLevel: NeutralIndication = 'LOWER CONCERN';
     if (rawScore > 60) indicationLevel = 'HIGHER CONCERN';
     else if (rawScore > 30) indicationLevel = 'MODERATE CONCERN';
 
     const whyHighlighted: string[] = [];
+
+    if (safetyResponses.length > 0) {
+      whyHighlighted.push(`Urgent safety check items noted: ${safetyResponses.join(', ')}`);
+    }
+
     questions.forEach((q) => {
       const val = answers[q.id];
       if (val && val >= 2) {
@@ -101,8 +116,11 @@ function UnifiedScreeningContent() {
       whyHighlighted.push('Selected responses indicate mild or occasional symptoms');
     }
 
+    const photoCount = (attachedMedia as any)?.photoCount || ((attachedMedia as any)?.views ? (attachedMedia as any).views.length : attachedMedia ? 1 : 0);
+    const visualLabelType = attachedMedia?.type === 'video' ? 'video' : photoCount === 5 ? '5 photos' : photoCount > 1 ? `${photoCount} photos` : 'photo';
+
     if (attachedMedia) {
-      whyHighlighted.push(`Optional ${attachedMedia.type} visual input attached for evaluation`);
+      whyHighlighted.push(`Visual input (${visualLabelType}) attached for dental review`);
     }
 
     const result: ScreeningResult = {
@@ -115,7 +133,7 @@ function UnifiedScreeningContent() {
       symptomsScore: rawScore,
       whyHighlighted: whyHighlighted.slice(0, 4),
       hasVisualInput: !!attachedMedia,
-      visualInputType: attachedMedia?.type,
+      visualInputType: visualLabelType as any,
       attachedVisualInput: attachedMedia,
       recommendedNextStep: `Consider discussing these persistent or concerning ${selectedConcern.toLowerCase()} symptoms with a dental professional.`,
       recommendations: [
@@ -126,30 +144,29 @@ function UnifiedScreeningContent() {
     };
 
     try {
-      const response = await fetch('http://localhost:5000/api/screenings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const savedDoc = await saveApiScreening({
+        patientId: 'pat-default',
+        concern: result.concern,
+        overallScore: result.overallScore,
+        score: result.overallScore,
+        indicationLevel: result.indicationLevel,
+        safety: {
+          selectedItems: safetyResponses,
+          hasSafetyAlerts: safetyResponses.length > 0,
         },
-        body: JSON.stringify({
-          patientId: 'pat-default',
-          concern: result.concern,
-          overallScore: result.overallScore,
-          score: result.overallScore,
-          indicationLevel: result.indicationLevel,
-          summary: result.recommendedNextStep || 'AI-assisted screening summary',
-          recommendedNextStep: result.recommendedNextStep,
-        }),
+        symptoms: whyHighlighted,
+        answers,
+        visualInputs: (attachedMedia as any)?.views || (attachedMedia ? [attachedMedia] : []),
+        hasVisualInput: result.hasVisualInput,
+        visualInputType: result.visualInputType,
+        whyHighlighted: result.whyHighlighted,
+        summary: result.recommendedNextStep || 'AI-assisted screening summary',
+        recommendedNextStep: result.recommendedNextStep,
+        recommendations: result.recommendations,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Backend server returned status ${response.status}`);
-      }
-
-      const resData = await response.json();
-      if (!resData.success) {
-        throw new Error(resData.message || 'Failed to save screening result.');
+      if (!savedDoc) {
+        throw new Error('Failed to save screening result to database.');
       }
 
       saveScreeningResult(result);
@@ -162,7 +179,6 @@ function UnifiedScreeningContent() {
 
   return (
     <div className="min-h-[85vh] py-10 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto space-y-8">
-      
       {/* Header Stepper Banner */}
       <div className="text-center space-y-3">
         <Badge variant="primary" className="bg-cyan-100 text-cyan-800 border-cyan-200">
@@ -172,7 +188,7 @@ function UnifiedScreeningContent() {
           Dental Symptom Early-Screening
         </h1>
         <p className="text-slate-600 text-sm sm:text-base max-w-xl mx-auto">
-          BruxCare provides an early screening summary for informational purposes. It does not diagnose dental conditions or replace professional dental evaluation.
+          OralSense provides an early screening summary for informational purposes. It does not diagnose dental conditions or replace professional dental evaluation.
         </p>
       </div>
 
@@ -216,13 +232,12 @@ function UnifiedScreeningContent() {
 
       {/* STEP 2: URGENT SYMPTOM SAFETY CHECK */}
       {currentStep === 'urgent' && (
-        <UrgentCheckStep onContinue={() => setCurrentStep('questions')} />
+        <UrgentCheckStep initialSelected={safetyResponses} onContinue={handleUrgentComplete} />
       )}
 
       {/* STEP 3: PERSONALIZED SCREENING QUESTIONS */}
       {currentStep === 'questions' && (
         <Card className="p-6 sm:p-10 shadow-premium border-brand-100 bg-white space-y-8">
-          
           {/* Question Sub-header */}
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div>
@@ -307,7 +322,6 @@ function UnifiedScreeningContent() {
               {currentQuestionIndex === totalQuestions - 1 ? 'Proceed to Visual Check' : 'Next Question'}
             </Button>
           </div>
-
         </Card>
       )}
 
@@ -362,7 +376,6 @@ function UnifiedScreeningContent() {
         <AlertCircle className="w-4 h-4 shrink-0 text-slate-400" />
         <span>OralSense provides an early screening summary for informational purposes. It does not diagnose dental conditions or replace professional dental evaluation.</span>
       </div>
-
     </div>
   );
 }

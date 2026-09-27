@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getStoredAppointments, cancelAppointment } from '@/lib/storage';
+import { getApiAppointments } from '@/lib/api';
 import { Appointment } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -19,7 +20,17 @@ export default function AppointmentsPage() {
   const [cancelModalApt, setCancelModalApt] = useState<Appointment | null>(null);
 
   useEffect(() => {
-    setAppointments(getStoredAppointments());
+    const localApts = getStoredAppointments();
+    setAppointments(localApts);
+
+    getApiAppointments().then((apiApts) => {
+      if (apiApts && apiApts.length > 0) {
+        // Merge API appointments with local appointments avoiding duplicate IDs
+        const existingIds = new Set(apiApts.map((a) => a.id));
+        const nonDuplicateLocal = localApts.filter((a) => !existingIds.has(a.id));
+        setAppointments([...apiApts, ...nonDuplicateLocal]);
+      }
+    });
   }, []);
 
   const handleConfirmCancel = () => {
